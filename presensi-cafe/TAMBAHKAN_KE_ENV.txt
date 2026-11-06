@@ -1,0 +1,12 @@
+
+# ==========================================
+# Langganan
+# ==========================================
+LANGGANAN_TRIAL_HARI=14
+LANGGANAN_TRIAL_PAKET=bisnis
+LANGGANAN_GRACE_HARI=3
+
+# Rekening tujuan transfer langganan (ditampilkan ke admin cafe saat checkout)
+LANGGANAN_BANK=BCA
+LANGGANAN_REKENING_NOMOR=1234567890
+LANGGANAN_REKENING_NAMA="PT Contoh Presensi"

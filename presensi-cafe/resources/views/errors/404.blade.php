@@ -1,0 +1,5 @@
+@extends('errors.layout')
+@section('title', 'Halaman Tidak Ditemukan')
+@section('code', '404')
+@section('judul', 'Halaman Tidak Ditemukan')
+@section('pesan', 'Halaman yang dicari mungkin sudah dipindah atau memang tidak pernah ada.')
