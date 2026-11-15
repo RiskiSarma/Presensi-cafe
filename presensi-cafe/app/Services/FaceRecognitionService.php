@@ -140,4 +140,36 @@ class FaceRecognitionService
             ];
         }
     }
+
+    /**
+     * Cek kedipan mata dari rangkaian frame (urut waktu).
+     *
+     * @param  array<int,\Illuminate\Http\UploadedFile>  $frames
+     */
+    public function cekLiveness(array $frames): array
+    {
+        try {
+            $request = Http::asMultipart()->timeout(30);
+            foreach (array_values($frames) as $i => $frame) {
+                $request = $request->attach('fotos', file_get_contents($frame->getRealPath()), "frame{$i}.jpg");
+            }
+
+            $response = $request->post("{$this->baseUrl}/liveness");
+
+            if (! $response->successful()) {
+                return ['success' => false, 'live' => false, 'konsisten' => true, 'message' => 'Verifikasi kedipan gagal diproses.'];
+            }
+
+            return [
+                'success' => true,
+                'live' => (bool) $response->json('live'),
+                'konsisten' => (bool) $response->json('konsisten', true),
+                'message' => $response->json('message'),
+            ];
+        } catch (\Throwable $e) {
+            Log::error('FaceRecognitionService::cekLiveness gagal', ['error' => $e->getMessage()]);
+
+            return ['success' => false, 'live' => false, 'konsisten' => true, 'message' => 'Face recognition service tidak dapat dihubungi.'];
+        }
+    }
 }

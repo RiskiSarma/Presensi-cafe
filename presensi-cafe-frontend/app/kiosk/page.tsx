@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
-import { LogIn, LogOut, Coffee, Loader2, CheckCircle2, XCircle, Settings, KeyRound, AlertTriangle, ArrowLeft } from "lucide-react";
+import { LogIn, LogOut, Loader2, CheckCircle2, XCircle, Settings, KeyRound, AlertTriangle, ArrowLeft } from "lucide-react";
 import { kioskApi, KIOSK_TOKEN_KEY } from "@/lib/api";
 import CameraCapture, { CameraCaptureHandle } from "@/components/CameraCapture";
 import ReceiptCard from "@/components/ui/ReceiptCard";
 import Button from "@/components/ui/Button";
 import CoffeeBeanPattern from "@/components/ui/CoffeeBeanPattern";
+import { LogoMark } from "@/components/ui/Logo";
+import { labelStatusPresensi } from "@/lib/status-presensi";
 
 type Mode = "idle" | "scanning" | "submitting" | "success" | "error";
 type JenisPresensi = "masuk" | "pulang";
@@ -17,6 +19,7 @@ interface HasilPresensi {
   jabatan: string;
   jam: string;
   status: string;
+  menit?: number;
 }
 
 export default function KioskPage() {
@@ -116,12 +119,22 @@ function KioskMain({
   const [hasil, setHasil] = useState<HasilPresensi | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [jam, setJam] = useState(new Date());
+  const [livenessAktif, setLivenessAktif] = useState(false);
+  const [kedip, setKedip] = useState(false);
   const cameraRef = useRef<CameraCaptureHandle>(null);
   const resetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => setJam(new Date()), 1000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Apakah cabang ini mewajibkan kedip mata
+  useEffect(() => {
+    kioskApi
+      .get("/kiosk/info")
+      .then(({ data }) => setLivenessAktif(!!data.liveness_aktif))
+      .catch(() => setLivenessAktif(false));
   }, []);
 
   const kembaliKeIdle = useCallback(() => {
@@ -160,7 +173,19 @@ function KioskMain({
   }, [mode, countdown]);
 
   async function handleCapture() {
-    const blob = await cameraRef.current?.capture();
+    let blob: Blob | null | undefined;
+    let frames: Blob[] = [];
+
+    if (livenessAktif) {
+      setKedip(true);
+      const rekaman = await cameraRef.current?.captureBurst();
+      setKedip(false);
+      blob = rekaman?.foto;
+      frames = rekaman?.frames ?? [];
+    } else {
+      blob = await cameraRef.current?.capture();
+    }
+
     if (!blob || !jenis) {
       setErrorMsg("Gagal mengambil gambar dari kamera. Coba lagi.");
       setMode("error");
@@ -175,6 +200,7 @@ function KioskMain({
 
       const formData = new FormData();
       formData.append("foto", blob, "capture.jpg");
+      frames.forEach((f, i) => formData.append("frames[]", f, `frame${i}.jpg`));
       formData.append("latitude", String(position.coords.latitude));
       formData.append("longitude", String(position.coords.longitude));
 
@@ -192,6 +218,7 @@ function KioskMain({
           minute: "2-digit",
         }),
         status: presensi.status,
+        menit: presensi.menit_terlambat ?? 0,
       });
       setMode("success");
       scheduleReset();
@@ -242,7 +269,7 @@ function KioskMain({
 
       <div className="absolute top-8 flex flex-col items-center gap-1">
         <div className="flex items-center gap-2 text-kiosk-text/60">
-          <Coffee className="h-4 w-4" />
+          <LogoMark className="h-5 w-5" />
           <span className="text-sm">Presensi Cafe</span>
         </div>
         <span className="font-mono text-3xl tabular-nums">
@@ -280,8 +307,10 @@ function KioskMain({
       {mode === "scanning" && (
         <div className="relative z-10 flex w-full max-w-sm flex-col items-center gap-4">
           <CameraCapture ref={cameraRef} variant="dark" />
-          <p key={countdown} className="animate-scale-in font-mono text-5xl">{countdown > 0 ? countdown : "📸"}</p>
-          <p className="text-sm text-kiosk-text/60">Posisikan wajah di dalam lingkaran</p>
+          <p key={countdown} className="animate-scale-in font-mono text-5xl">{kedip ? "👁️" : countdown > 0 ? countdown : "📸"}</p>
+          <p className={`text-sm ${kedip ? "animate-pulse font-semibold text-espresso-light" : "text-kiosk-text/60"}`}>
+            {kedip ? "Kedipkan mata Anda sekarang…" : livenessAktif ? "Posisikan wajah di lingkaran, lalu kedipkan mata saat diminta" : "Posisikan wajah di dalam lingkaran"}
+          </p>
         </div>
       )}
 
@@ -314,7 +343,7 @@ function KioskMain({
               </div>
               <div className="flex justify-between pt-2">
                 <span className="text-muted">Status</span>
-                <span className="capitalize">{hasil.status.replace("_", " ")}</span>
+                <span className="capitalize">{labelStatusPresensi(hasil.status, hasil.menit)}</span>
               </div>
             </div>
           </ReceiptCard>

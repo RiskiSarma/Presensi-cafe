@@ -1,14 +1,15 @@
 import Link from "next/link";
-import { Coffee, ArrowRight, MessageCircle } from "lucide-react";
+import { ArrowRight, MessageCircle } from "lucide-react";
 import CoffeeBeanPattern from "@/components/ui/CoffeeBeanPattern";
 import OrganicBlob from "@/components/ui/OrganicBlob";
 import Reveal from "./Reveal";
+import { LogoMark } from "@/components/ui/Logo";
 
 // Nomor WhatsApp admin (format internasional tanpa + atau spasi, contoh 6281234567890).
 // Isi lewat NEXT_PUBLIC_WHATSAPP_NUMBER di .env.local frontend.
 const NOMOR_WA = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "";
 const PESAN_WA = "Halo, saya tertarik dengan Presensi Cafe dan ingin bertanya lebih lanjut.";
-const LINK_WA = `https://wa.me/${6281269334494}?text=${encodeURIComponent(PESAN_WA)}`;
+const LINK_WA = `https://wa.me/${NOMOR_WA}?text=${encodeURIComponent(PESAN_WA)}`;
 
 export function Cta() {
   return (
@@ -51,8 +52,8 @@ export function Footer() {
     <footer className="border-t border-border bg-surface">
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 py-8 text-sm text-muted md:flex-row md:px-6">
         <Link href="/" className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-blob bg-bistro-gradient">
-            <Coffee className="h-4 w-4 text-cream" />
+          <span className="flex h-8 w-8 items-center justify-center rounded-blob bg-white ring-1 ring-black/5">
+            <LogoMark className="h-full w-full p-1" />
           </span>
           <span className="font-semibold text-ink">Presensi Cafe</span>
         </Link>
@@ -63,7 +64,7 @@ export function Footer() {
           <Link href="/login" className="hover:text-ink">Masuk</Link>
           <Link href="/register" className="hover:text-ink">Daftar</Link>
         </nav> */}
-        <p>© {new Date().getFullYear()} Presensi Cafe a product by KaryaLokal</p>
+        <p>© {new Date().getFullYear()} Presensi Cafe Product by Karya Lokal</p>
       </div>
     </footer>
   );

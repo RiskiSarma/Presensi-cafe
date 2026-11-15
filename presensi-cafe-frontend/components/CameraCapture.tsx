@@ -5,6 +5,11 @@ import { Camera, RotateCcw } from "lucide-react";
 
 export interface CameraCaptureHandle {
   capture: () => Promise<Blob | null>;
+  /**
+   * Rekam rangkaian frame untuk verifikasi kedipan mata. `foto` = frame pertama beresolusi penuh
+   * (dipakai untuk pengenalan wajah), `frames` = seluruh rangkaian beresolusi kecil.
+   */
+  captureBurst: (opts?: { jumlah?: number; intervalMs?: number }) => Promise<{ foto: Blob; frames: Blob[] } | null>;
 }
 
 interface CameraCaptureProps {
@@ -52,6 +57,35 @@ const CameraCapture = forwardRef<CameraCaptureHandle, CameraCaptureProps>(
     }, []);
 
     useImperativeHandle(ref, () => ({
+      captureBurst: async ({ jumlah = 16, intervalMs = 150 } = {}) => {
+        const video = videoRef.current;
+        if (!video || !video.videoWidth) return null;
+
+        const ambil = (lebar: number, kualitas: number) =>
+          new Promise<Blob | null>((resolve) => {
+            const c = document.createElement("canvas");
+            c.width = lebar;
+            c.height = Math.round((video.videoHeight / video.videoWidth) * lebar);
+            const ctx = c.getContext("2d");
+            if (!ctx) return resolve(null);
+            ctx.drawImage(video, 0, 0, c.width, c.height);
+            c.toBlob((b) => resolve(b), "image/jpeg", kualitas);
+          });
+
+        const foto = await ambil(video.videoWidth, 0.9);
+        if (!foto) return null;
+
+        const frames: Blob[] = [];
+        for (let i = 0; i < jumlah; i++) {
+          const mulai = performance.now();
+          const frame = await ambil(360, 0.7);
+          if (frame) frames.push(frame);
+          const sisa = intervalMs - (performance.now() - mulai);
+          if (sisa > 0) await new Promise((r) => setTimeout(r, sisa));
+        }
+
+        return { foto, frames };
+      },
       capture: () => {
         return new Promise<Blob | null>((resolve) => {
           const video = videoRef.current;

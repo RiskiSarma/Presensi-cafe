@@ -11,6 +11,7 @@ interface PresensiRow {
   jam_masuk: string | null;
   jam_pulang: string | null;
   status: string;
+  menit_terlambat?: number | null;
   pegawai_profil: { jabatan: string; user: { name: string } };
 }
 
@@ -112,7 +113,7 @@ export default function AdminDashboardPage() {
                   {p.jam_pulang ? new Date(p.jam_pulang).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "-"}
                 </td>
                 <td className="px-4 py-3">
-                  <StatusBadge status={p.status} />
+                  <StatusBadge status={p.status} menit={p.menit_terlambat} />
                 </td>
               </tr>
             ))}

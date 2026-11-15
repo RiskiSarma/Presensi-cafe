@@ -30,7 +30,7 @@ class PegawaiController extends Controller
                     ->orWhereHas('user', fn ($uq) => $uq->where('name', 'like', "%{$request->search}%"));
             })
             ->latest()
-            ->paginate(15);
+            ->paginate(min(max((int) $request->input('per_page', 15), 1), 200));
 
         return response()->json($pegawai);
     }

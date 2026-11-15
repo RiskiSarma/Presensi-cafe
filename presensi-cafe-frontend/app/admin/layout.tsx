@@ -1,34 +1,29 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Coffee,
-  LayoutDashboard,
-  Users,
-  CalendarDays,
-  ClipboardCheck,
-  FileText,
-  LogOut,
-  Loader2,
-  MapPin,
-  CreditCard,
-  Lock,
-} from "lucide-react";
+import { Coffee, LayoutDashboard, Users, CalendarDays, ClipboardCheck, FileText, LogOut, Loader2, MapPin, CreditCard, Lock, FileSpreadsheet, CalendarOff, History, ArrowLeftRight } from "lucide-react";
 import { useRequireRole } from "@/lib/useRequireRole";
 import { useAuth } from "@/lib/auth-context";
 import { LanggananProvider, useLangganan } from "@/lib/langganan-context";
 import type { AuthUser, FiturKey } from "@/lib/api";
 import LanggananBanner from "@/components/ui/LanggananBanner";
+import VerifikasiEmailBanner from "@/components/ui/VerifikasiEmailBanner";
 import { AksesDitutup, FiturTerkunci } from "@/components/ui/AksesDitutup";
+import { LogoMark } from "@/components/ui/Logo";
 
 const navItems: { href: string; label: string; icon: typeof Coffee; fitur?: FiturKey }[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/pegawai", label: "Pegawai", icon: Users },
   { href: "/admin/shift", label: "Shift & Jadwal", icon: CalendarDays },
   { href: "/admin/presensi", label: "Laporan Presensi", icon: ClipboardCheck },
+  { href: "/admin/rekap", label: "Rekap Bulanan", icon: FileSpreadsheet, fitur: "rekap" },
   { href: "/admin/izin", label: "Pengajuan Izin", icon: FileText, fitur: "izin" },
+  { href: "/admin/tukar-shift", label: "Tukar Shift", icon: ArrowLeftRight, fitur: "tukar_shift" },
   { href: "/admin/cabang", label: "Cabang", icon: MapPin },
+  { href: "/admin/libur", label: "Hari Libur", icon: CalendarOff },
+  { href: "/admin/log", label: "Log Aktivitas", icon: History },
   { href: "/admin/langganan", label: "Langganan", icon: CreditCard },
 ];
 
@@ -58,9 +53,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
 function AdminShell({ user, logout, children }: { user: AuthUser; logout: () => void; children: React.ReactNode }) {
   const pathname = usePathname();
+  const { refreshUser } = useAuth();
   const { data, isLoading, punyaFitur } = useLangganan();
 
-  const bebas = HALAMAN_BEBAS.includes(pathname);
+  // Setelah klik link verifikasi di email, ambil status terbaru supaya peringatan hilang
+  useEffect(() => {
+    if (!user.email_verified_at) refreshUser();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const bebas = HALAMAN_BEBAS.some((h) => pathname === h || pathname.startsWith(h + "/"));
   const itemTerkunci = navItems.find((i) => i.fitur && pathname === i.href && !punyaFitur(i.fitur));
 
   function renderKonten() {
@@ -99,8 +101,8 @@ function AdminShell({ user, logout, children }: { user: AuthUser; logout: () => 
     <div className="flex h-screen overflow-hidden bg-paper">
       <aside className="hidden h-full w-60 shrink-0 flex-col overflow-y-auto border-r border-border/70 bg-surface px-4 py-6 md:flex">
         <div className="mb-8 flex items-center gap-2.5 px-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-espresso-gradient shadow-warm">
-            <Coffee className="h-4 w-4 text-cream" />
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white ring-1 ring-black/5 shadow-warm">
+            <LogoMark className="h-full w-full p-1" />
           </span>
           <span className="font-semibold text-ink">Presensi Cafe</span>
         </div>
@@ -156,7 +158,7 @@ function AdminShell({ user, logout, children }: { user: AuthUser; logout: () => 
       <div className="flex h-full min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-border bg-surface px-4 py-3 md:hidden">
           <div className="flex items-center gap-2">
-            <Coffee className="h-5 w-5 text-espresso" />
+            <LogoMark className="h-6 w-6" />
             <span className="font-semibold text-ink">Presensi Cafe</span>
           </div>
           <button onClick={logout} className="text-muted hover:text-danger">
@@ -164,12 +166,13 @@ function AdminShell({ user, logout, children }: { user: AuthUser; logout: () => 
           </button>
         </header>
 
+        {!user.email_verified_at && <VerifikasiEmailBanner email={user.email} />}
         {data && pathname !== "/admin/langganan" && <LanggananBanner data={data} />}
 
         <main className="min-h-0 flex-1 overflow-y-auto pb-16 md:pb-0">{renderKonten()}</main>
 
         {/* Bottom nav mobile */}
-        <nav className="fixed inset-x-0 bottom-0 flex justify-around border-t border-border bg-surface py-2 md:hidden">
+        <nav className="fixed inset-x-0 bottom-0 flex overflow-x-auto border-t border-border bg-surface py-2 md:hidden">
           {navItems.map((item) => {
             const active = pathname === item.href;
             const Icon = item.icon;
@@ -177,7 +180,7 @@ function AdminShell({ user, logout, children }: { user: AuthUser; logout: () => 
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center gap-0.5 px-1 py-1 text-[10px] ${
+                className={`flex min-w-[4.5rem] flex-1 shrink-0 flex-col items-center gap-0.5 px-1 py-1 text-[10px] ${
                   active ? "text-espresso" : "text-muted"
                 }`}
               >

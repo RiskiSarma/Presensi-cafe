@@ -4,6 +4,11 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BisnisController;
 use App\Http\Controllers\Api\CabangController;
 use App\Http\Controllers\Api\JadwalShiftController;
+use App\Http\Controllers\Api\EmailVerifikasiController;
+use App\Http\Controllers\Api\HariLiburController;
+use App\Http\Controllers\Api\KoreksiPresensiController;
+use App\Http\Controllers\Api\KuponController;
+use App\Http\Controllers\Api\LogAktivitasController;
 use App\Http\Controllers\Api\LanggananController;
 use App\Http\Controllers\Api\MidtransNotificationController;
 use App\Http\Controllers\Api\PaketController;
@@ -13,7 +18,10 @@ use App\Http\Controllers\Api\PegawaiController;
 use App\Http\Controllers\Api\PengajuanIzinController;
 use App\Http\Controllers\Api\PresensiController;
 use App\Http\Controllers\Api\RegisterController;
+use App\Http\Controllers\Api\RekapController;
+use App\Http\Controllers\Api\RingkasanController;
 use App\Http\Controllers\Api\ShiftController;
+use App\Http\Controllers\Api\TukarShiftController;
 use Illuminate\Support\Facades\Route;
 
 // ==========================
@@ -24,12 +32,14 @@ Route::post('/register', [RegisterController::class, 'register'])->middleware('t
 Route::post('/forgot-password', [PasswordResetController::class, 'kirimLink'])->middleware('throttle:5,1');
 Route::post('/reset-password', [PasswordResetController::class, 'reset'])->middleware('throttle:6,1');
 Route::get('/paket', [LanggananController::class, 'daftarPaket']);
+Route::get('/email/verifikasi/{id}/{hash}', [EmailVerifikasiController::class, 'verifikasi'])->middleware('signed')->name('email.verifikasi');
 Route::post('/midtrans/notification', [MidtransNotificationController::class, 'handle']);
 
 // ==========================
 // Kiosk (proteksi token device, bukan login user)
 // ==========================
 Route::middleware(['kiosk.token', 'langganan.aktif', 'fitur:kiosk'])->prefix('kiosk')->group(function () {
+    Route::get('/info', [PresensiController::class, 'infoKiosk']);
     Route::post('/presensi/check-in', [PresensiController::class, 'checkInKiosk']);
     Route::post('/presensi/check-out', [PresensiController::class, 'checkOutKiosk']);
 });
@@ -38,6 +48,9 @@ Route::middleware(['kiosk.token', 'langganan.aktif', 'fitur:kiosk'])->prefix('ki
 // Butuh login (semua role)
 // ==========================
 Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/profil/opsi', [AuthController::class, 'opsiProfil']);
+    Route::post('/email/kirim-ulang', [EmailVerifikasiController::class, 'kirimUlang'])->middleware('throttle:3,1');
+
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
     Route::put('/profil', [AuthController::class, 'updateProfil']);
@@ -51,6 +64,15 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/jadwal-shift-saya', [JadwalShiftController::class, 'index']);
 
+        Route::middleware('fitur:tukar_shift')->group(function () {
+            Route::get('/tukar-shift', [TukarShiftController::class, 'saya']);
+            Route::get('/tukar-shift/opsi', [TukarShiftController::class, 'opsi']);
+            Route::get('/tukar-shift/rekan/{pegawai}', [TukarShiftController::class, 'jadwalRekan']);
+            Route::post('/tukar-shift', [TukarShiftController::class, 'store']);
+            Route::put('/tukar-shift/{tukarShift}/jawab', [TukarShiftController::class, 'jawab']);
+            Route::delete('/tukar-shift/{tukarShift}', [TukarShiftController::class, 'batalkan']);
+        });
+
         Route::middleware('fitur:izin')->group(function () {
             Route::post('/pengajuan-izin', [PengajuanIzinController::class, 'store']);
             Route::get('/pengajuan-izin/riwayat-saya', [PengajuanIzinController::class, 'riwayatSaya']);
@@ -63,6 +85,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/langganan/saya', [LanggananController::class, 'saya']);
         Route::get('/langganan/riwayat', [LanggananController::class, 'riwayat']);
         Route::post('/langganan/checkout', [LanggananController::class, 'checkout']);
+        Route::post('/langganan/kupon/cek', [LanggananController::class, 'cekKupon']);
+        Route::get('/langganan/pembayaran/{pembayaran}/invoice', [LanggananController::class, 'invoice']);
         Route::post('/langganan/pembayaran/{pembayaran}/bukti', [LanggananController::class, 'uploadBukti']);
         Route::post('/langganan/pembayaran/{pembayaran}/sinkron', [LanggananController::class, 'sinkron']);
         Route::delete('/langganan/pembayaran/{pembayaran}', [LanggananController::class, 'batalkan']);
@@ -74,6 +98,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::apiResource('shifts', ShiftController::class);
 
+        Route::middleware('fitur:tukar_shift')->group(function () {
+            Route::get('/tukar-shift-admin', [TukarShiftController::class, 'indexAdmin']);
+            Route::put('/tukar-shift-admin/{tukarShift}/putuskan', [TukarShiftController::class, 'putuskan']);
+        });
+
         Route::get('/jadwal-shift', [JadwalShiftController::class, 'index']);
         Route::post('/jadwal-shift', [JadwalShiftController::class, 'store']);
         Route::post('/jadwal-shift/bulk', [JadwalShiftController::class, 'storeBulk']);
@@ -81,6 +110,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/jadwal-shift/{jadwalShift}', [JadwalShiftController::class, 'destroy']);
 
         Route::get('/presensi', [PresensiController::class, 'index']);
+        Route::post('/presensi/koreksi', [KoreksiPresensiController::class, 'store']);
+        Route::get('/hari-libur', [HariLiburController::class, 'index']);
+        Route::post('/hari-libur', [HariLiburController::class, 'store']);
+        Route::delete('/hari-libur/{hariLibur}', [HariLiburController::class, 'destroy']);
+        Route::get('/log-aktivitas', [LogAktivitasController::class, 'index']);
+        Route::get('/rekap/bulanan', [RekapController::class, 'bulanan'])->middleware('fitur:rekap');
 
         Route::middleware('fitur:izin')->group(function () {
             Route::get('/pengajuan-izin', [PengajuanIzinController::class, 'index']);
@@ -104,6 +139,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/bisnis/{bisnis}', [BisnisController::class, 'destroy']);
         Route::put('/bisnis/{bisnis}/langganan', [BisnisController::class, 'aturLangganan']);
         Route::put('/bisnis/{bisnis}/fitur', [BisnisController::class, 'aturFitur']);
+
+        Route::get('/ringkasan', [RingkasanController::class, 'index']);
+
+        Route::get('/kupon', [KuponController::class, 'index']);
+        Route::post('/kupon', [KuponController::class, 'store']);
+        Route::put('/kupon/{kupon}', [KuponController::class, 'update']);
+        Route::delete('/kupon/{kupon}', [KuponController::class, 'destroy']);
 
         Route::get('/paket', [PaketController::class, 'index']);
         Route::post('/paket', [PaketController::class, 'store']);

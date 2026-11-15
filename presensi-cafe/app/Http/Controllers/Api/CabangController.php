@@ -32,6 +32,7 @@ class CabangController extends Controller
             'latitude' => 'required|numeric|between:-90,90',
             'longitude' => 'required|numeric|between:-180,180',
             'radius_meter' => 'required|integer|min:10',
+            'liveness_aktif' => 'sometimes|boolean',
         ]);
 
         $validated['kiosk_token'] = Str::random(48);
@@ -60,6 +61,7 @@ class CabangController extends Controller
             'latitude' => 'sometimes|numeric|between:-90,90',
             'longitude' => 'sometimes|numeric|between:-180,180',
             'radius_meter' => 'sometimes|integer|min:10',
+            'liveness_aktif' => 'sometimes|boolean',
             'is_active' => 'sometimes|boolean',
         ]);
 

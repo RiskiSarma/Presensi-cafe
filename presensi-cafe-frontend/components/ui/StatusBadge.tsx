@@ -24,12 +24,20 @@ const dotColor: Record<string, string> = {
   ditolak: "bg-danger",
 };
 
-export default function StatusBadge({ status }: { status: string }) {
+/** `menit` (opsional) = menit keterlambatan dari jam mulai shift, dipakai untuk status presensi. */
+export default function StatusBadge({ status, menit }: { status: string; menit?: number | null }) {
   const config = statusConfig[status] ?? { label: status, className: "bg-paper text-muted" };
+
+  let label = config.label;
+  if (menit && menit > 0) {
+    if (status === "terlambat") label = `Terlambat ${menit} mnt`;
+    else if (status === "tepat_waktu") label = `Hadir · telat ${menit} mnt`;
+  }
+
   return (
     <span className={`inline-flex animate-fade-in items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${config.className}`}>
       <span className={`h-1.5 w-1.5 rounded-full ${dotColor[status] ?? "bg-muted"}`} />
-      {config.label}
+      {label}
     </span>
   );
 }

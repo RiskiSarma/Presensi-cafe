@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Models\Bisnis;
 use App\Models\Cabang;
+use App\Models\Kupon;
 use App\Models\Langganan;
+use App\Models\LogAktivitas;
 use App\Models\Paket;
 use App\Models\PegawaiProfil;
 use App\Models\PembayaranLangganan;
@@ -261,24 +263,34 @@ class LanggananService
                 $bisnis->update(['status' => 'aktif']);
             }
 
+            LogAktivitas::catat(
+                $bisnis->id,
+                auth()->user(),
+                'langganan',
+                'Langganan',
+                "Langganan paket {$paket->nama} ({$siklus}) aktif sampai " . $berakhir->format('d M Y')
+            );
+
             return $langganan->load('paket');
         });
     }
 
     /** Buat tagihan baru. Tagihan lama yang belum dibayar otomatis dibatalkan. */
-    public function buatTagihan(Bisnis $bisnis, Paket $paket, string $siklus, string $metode = 'transfer'): PembayaranLangganan
+    public function buatTagihan(Bisnis $bisnis, Paket $paket, string $siklus, string $metode = 'transfer', ?Kupon $kupon = null): PembayaranLangganan
     {
-        return DB::transaction(function () use ($bisnis, $paket, $siklus, $metode) {
+        return DB::transaction(function () use ($bisnis, $paket, $siklus, $metode, $kupon) {
             PembayaranLangganan::where('bisnis_id', $bisnis->id)
                 ->where('status', 'menunggu_pembayaran')
                 ->update(['status' => 'dibatalkan']);
 
-            $dasar = $paket->harga($siklus);
+            $hargaAsli = $paket->harga($siklus);
+            $diskon = $kupon ? $kupon->hitungDiskon($hargaAsli) : 0;
+            $dasar = max($hargaAsli - $diskon, 0);
 
             // Kode unik 3 digit ditambahkan ke nominal supaya transfer mudah dicocokkan di mutasi rekening
             // (hanya untuk transfer manual; Midtrans mencocokkan pembayaran lewat order_id)
             $kodeUnik = 0;
-            for ($i = 0; $metode === 'transfer' && config('langganan.kode_unik', true) && $i < 30; $i++) {
+            for ($i = 0; $dasar > 0 && $metode === 'transfer' && config('langganan.kode_unik', true) && $i < 30; $i++) {
                 $kandidat = random_int(11, 999);
                 $bentrok = PembayaranLangganan::whereIn('status', ['menunggu_pembayaran', 'menunggu_konfirmasi'])
                     ->where('jumlah_total', $dasar + $kandidat)
@@ -293,7 +305,11 @@ class LanggananService
                 'bisnis_id' => $bisnis->id,
                 'paket_id' => $paket->id,
                 'siklus' => $siklus,
-                'metode' => $metode,
+                'metode' => $dasar > 0 ? $metode : 'kupon',
+                'kupon_id' => $kupon?->id,
+                'kode_kupon' => $kupon?->kode,
+                'harga_asli' => $hargaAsli,
+                'diskon' => $diskon,
                 'jumlah_dasar' => $dasar,
                 'kode_unik' => $kodeUnik,
                 'jumlah_total' => $dasar + $kodeUnik,
@@ -320,6 +336,10 @@ class LanggananService
                 'dikonfirmasi_at' => now(),
                 'dikonfirmasi_oleh' => $oleh,
             ]);
+
+            if ($p->kupon_id) {
+                Kupon::whereKey($p->kupon_id)->increment('terpakai');
+            }
 
             return $this->aktifkan($p->bisnis, $p->paket, $p->siklus, $p->id, $catatan ?? ('Pembayaran #' . $p->id));
         });

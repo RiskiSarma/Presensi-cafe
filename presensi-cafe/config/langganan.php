@@ -25,6 +25,13 @@ return [
         'atas_nama' => env('LANGGANAN_REKENING_NAMA', 'Isi di .env'),
     ],
 
+    // Identitas penerbit yang tercetak di invoice pembayaran langganan
+    'penerbit' => [
+        'nama' => env('LANGGANAN_PENERBIT_NAMA', 'Presensi Cafe'),
+        'alamat' => env('LANGGANAN_PENERBIT_ALAMAT', ''),
+        'email' => env('LANGGANAN_PENERBIT_EMAIL', ''),
+    ],
+
     // Katalog fitur yang bisa di-toggle per paket / per bisnis.
     // Tambah fitur baru: daftarkan key di sini, lalu pasang middleware 'fitur:<key>' di route terkait.
     'fitur' => [
@@ -35,6 +42,14 @@ return [
         'izin' => [
             'label' => 'Pengajuan Izin & Cuti',
             'deskripsi' => 'Pegawai ajukan izin/sakit/cuti, admin setujui atau tolak.',
+        ],
+        'rekap' => [
+            'label' => 'Rekap Bulanan & Ekspor',
+            'deskripsi' => 'Rekap kehadiran, keterlambatan, dan lembur tiap pegawai per bulan. Bisa diunduh ke Excel (CSV) atau dicetak.',
+        ],
+        'tukar_shift' => [
+            'label' => 'Tukar Shift Antar Pegawai',
+            'deskripsi' => 'Pegawai bisa mengajukan tukar shift dengan rekan, lalu disetujui admin. Jadwal berubah otomatis.',
         ],
         'lembur' => [
             'label' => 'Hitung Lembur Otomatis',

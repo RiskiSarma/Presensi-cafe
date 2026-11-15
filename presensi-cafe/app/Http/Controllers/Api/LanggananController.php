@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Kupon;
+use App\Models\Langganan;
 use App\Models\Paket;
 use App\Models\PembayaranLangganan;
 use App\Services\LanggananService;
@@ -68,6 +70,7 @@ class LanggananController extends Controller
             'paket_id' => 'required|exists:paket,id',
             'siklus' => 'required|in:bulanan,tahunan',
             'metode' => 'nullable|in:midtrans,transfer',
+            'kode_kupon' => 'nullable|string|max:30',
         ]);
 
         $metode = $validated['metode'] ?? 'transfer';
@@ -107,7 +110,23 @@ class LanggananController extends Controller
             }
         }
 
-        $tagihan = $this->service->buatTagihan($bisnis, $paket, $validated['siklus'], $metode);
+        $kupon = null;
+        if (! empty($validated['kode_kupon'])) {
+            $kupon = Kupon::where('kode', strtoupper(trim($validated['kode_kupon'])))->first();
+            $alasan = $kupon ? $kupon->alasanTidakValid($paket, $bisnis) : 'Kode kupon tidak ditemukan.';
+            if ($alasan) {
+                return response()->json(['message' => $alasan], 422);
+            }
+        }
+
+        $tagihan = $this->service->buatTagihan($bisnis, $paket, $validated['siklus'], $metode, $kupon);
+
+        // Diskon 100%: tidak perlu bayar, langsung aktif
+        if ($tagihan->jumlah_total <= 0) {
+            $this->service->selesaikanPembayaran($tagihan, null, 'Kupon ' . $kupon?->kode);
+
+            return response()->json(['tagihan' => $tagihan->fresh()->load('paket'), 'rekening' => config('langganan.rekening')], 201);
+        }
 
         if ($metode === 'midtrans') {
             try {
@@ -124,6 +143,53 @@ class LanggananController extends Controller
             'tagihan' => $tagihan,
             'rekening' => config('langganan.rekening'),
         ], 201);
+    }
+
+    /** Cek kode kupon (umum, belum terikat paket). Potongan harga per paket dihitung di sisi tampilan lalu divalidasi ulang saat checkout. */
+    public function cekKupon(Request $request)
+    {
+        $request->validate(['kode' => 'required|string|max:30']);
+
+        $kupon = Kupon::where('kode', strtoupper(trim($request->kode)))->first();
+        $alasan = $kupon ? $kupon->alasanTidakValid(null, $request->user()->bisnis) : 'Kode kupon tidak ditemukan.';
+
+        if ($alasan) {
+            return response()->json(['message' => $alasan], 422);
+        }
+
+        return response()->json($kupon->only(['kode', 'deskripsi', 'tipe', 'nilai', 'paket_target', 'berakhir_at']));
+    }
+
+    /** Data invoice untuk pembayaran yang sudah lunas. */
+    public function invoice(Request $request, PembayaranLangganan $pembayaran)
+    {
+        $this->pastikanMilikBisnisSendiri($request, $pembayaran);
+
+        if ($pembayaran->status !== 'lunas') {
+            return response()->json(['message' => 'Invoice hanya tersedia untuk pembayaran yang sudah lunas.'], 422);
+        }
+
+        $pembayaran->load(['paket', 'bisnis']);
+        $periode = Langganan::where('pembayaran_id', $pembayaran->id)->first();
+        $tanggal = $pembayaran->dikonfirmasi_at ?? $pembayaran->updated_at;
+
+        return response()->json([
+            'nomor' => sprintf('INV-%s-%05d', $tanggal->format('Y'), $pembayaran->id),
+            'tanggal' => $tanggal->toIso8601String(),
+            'bisnis' => ['nama' => $pembayaran->bisnis->nama_bisnis, 'email' => $pembayaran->bisnis->email_owner],
+            'paket' => $pembayaran->paket->nama,
+            'siklus' => $pembayaran->siklus,
+            'periode_mulai' => $periode?->mulai_at?->toIso8601String(),
+            'periode_berakhir' => $periode?->berakhir_at?->toIso8601String(),
+            'harga_asli' => $pembayaran->harga_asli ?? $pembayaran->jumlah_dasar,
+            'diskon' => $pembayaran->diskon,
+            'kode_kupon' => $pembayaran->kode_kupon,
+            'kode_unik' => $pembayaran->kode_unik,
+            'jumlah_total' => $pembayaran->jumlah_total,
+            'metode' => $pembayaran->metode,
+            'jenis_pembayaran' => $pembayaran->midtrans_payment_type,
+            'penerbit' => config('langganan.penerbit'),
+        ]);
     }
 
     public function uploadBukti(Request $request, PembayaranLangganan $pembayaran)

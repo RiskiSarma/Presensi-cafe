@@ -50,7 +50,7 @@ export default function AdminJadwalPage() {
   const tanggalSelesai = toISODate(new Date(minggu.getTime() + 6 * 86400000));
 
   useEffect(() => {
-    api.get("/pegawai").then(({ data }) => setPegawaiList(data.data ?? data));
+    api.get("/pegawai", { params: { per_page: 200 } }).then(({ data }) => setPegawaiList(data.data ?? data));
     api.get("/shifts").then(({ data }) => setShiftList(data.data ?? data));
   }, []);
 

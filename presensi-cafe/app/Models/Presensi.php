@@ -30,6 +30,10 @@ class Presensi extends Model
         'status',
         'lembur_menit',
         'catatan',
+        'dikoreksi_oleh',
+        'dikoreksi_at',
+        'alasan_koreksi',
+        'menit_terlambat'
     ];
 
     protected function casts(): array
@@ -38,6 +42,7 @@ class Presensi extends Model
             'tanggal' => 'date',
             'jam_masuk' => 'datetime',
             'jam_pulang' => 'datetime',
+            'dikoreksi_at' => 'datetime',
             'latitude_masuk' => 'float',
             'longitude_masuk' => 'float',
             'latitude_pulang' => 'float',

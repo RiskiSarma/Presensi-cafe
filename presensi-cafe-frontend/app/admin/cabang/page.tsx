@@ -15,6 +15,7 @@ interface Cabang {
   latitude: number;
   longitude: number;
   radius_meter: number;
+  liveness_aktif?: boolean;
   kiosk_token: string;
   is_active: boolean;
   pegawai_profils_count?: number;
@@ -98,7 +99,7 @@ export default function AdminCabangPage() {
             </div>
 
             <div className="mb-3 grid grid-cols-2 gap-2 text-xs text-muted">
-              <p>Radius: {c.radius_meter}m</p>
+              <p>Radius: {c.radius_meter}m{c.liveness_aktif ? " · kedip mata" : ""}</p>
               <p>{c.pegawai_profils_count ?? 0} pegawai</p>
             </div>
 
@@ -146,6 +147,7 @@ function CabangFormModal({ cabang, onClose, onSaved }: { cabang: Cabang | null; 
   const [latitude, setLatitude] = useState(cabang ? String(cabang.latitude) : "");
   const [longitude, setLongitude] = useState(cabang ? String(cabang.longitude) : "");
   const [radiusMeter, setRadiusMeter] = useState(cabang?.radius_meter ?? 100);
+  const [liveness, setLiveness] = useState(cabang?.liveness_aktif ?? false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -167,6 +169,7 @@ function CabangFormModal({ cabang, onClose, onSaved }: { cabang: Cabang | null; 
         latitude: Number(latitude),
         longitude: Number(longitude),
         radius_meter: radiusMeter,
+        liveness_aktif: liveness,
       };
       if (isEdit) {
         await api.put(`/cabang/${cabang!.id}`, payload);
@@ -219,6 +222,16 @@ function CabangFormModal({ cabang, onClose, onSaved }: { cabang: Cabang | null; 
               value={radiusMeter}
               onChange={(e) => setRadiusMeter(Number(e.target.value))}
             />
+
+            <label className="flex cursor-pointer items-start gap-2 text-sm">
+              <input type="checkbox" className="mt-0.5" checked={liveness} onChange={(e) => setLiveness(e.target.checked)} />
+              <span>
+                <span className="font-medium text-ink">Wajib kedip mata (anti foto/layar HP)</span>
+                <span className="block text-xs text-muted">
+                  Pegawai harus berkedip saat presensi, jadi foto diam tidak lolos. Butuh cahaya cukup. Tidak menahan video yang diputar ulang.
+                </span>
+              </span>
+            </label>
 
             {error && <p className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{error}</p>}
 

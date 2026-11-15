@@ -1,13 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Plus, Pencil } from "lucide-react";
 import { api } from "@/lib/api";
+import Button from "@/components/ui/Button";
+import KoreksiModal, { KoreksiAwal, PegawaiOpsi } from "@/components/admin/KoreksiModal";
 import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import StatusBadge from "@/components/ui/StatusBadge";
 
 interface PresensiRow {
   id: number;
+  pegawai_profil_id: number;
+  dikoreksi_at: string | null;
+  alasan_koreksi: string | null;
   tanggal: string;
   jam_masuk: string | null;
   jam_pulang: string | null;
@@ -15,6 +21,7 @@ interface PresensiRow {
   jenis_perangkat_masuk: string | null;
   confidence_score_masuk: number | null;
   status: string;
+  menit_terlambat?: number | null;
   lembur_menit: number | null;
   pegawai_profil: { jabatan: string; user: { name: string } };
 }
@@ -29,19 +36,32 @@ export default function AdminPresensiPage() {
   const [tanggalSelesai, setTanggalSelesai] = useState(toISODate(today));
   const [daftar, setDaftar] = useState<PresensiRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pegawaiList, setPegawaiList] = useState<PegawaiOpsi[]>([]);
+  const [koreksi, setKoreksi] = useState<{ awal?: KoreksiAwal; terkunci: boolean } | null>(null);
+  const [muat, setMuat] = useState(0);
 
   useEffect(() => {
     setLoading(true);
     api
-      .get("/presensi", { params: { tanggal_mulai: tanggalMulai, tanggal_selesai: tanggalSelesai } })
+      .get("/presensi", { params: { tanggal_mulai: tanggalMulai, tanggal_selesai: tanggalSelesai, per_page: 500 } })
       .then(({ data }) => setDaftar(data.data ?? data))
       .finally(() => setLoading(false));
-  }, [tanggalMulai, tanggalSelesai]);
+  }, [tanggalMulai, tanggalSelesai, muat]);
+
+  useEffect(() => {
+    api.get("/pegawai", { params: { per_page: 200, status_aktif: 1 } }).then(({ data }) => setPegawaiList(data.data ?? data));
+  }, []);
 
   return (
     <div className="p-4 md:p-8">
       <h1 className="mb-1 text-xl font-semibold text-ink">Laporan Presensi</h1>
-      <p className="mb-6 text-sm text-muted">Riwayat presensi semua pegawai</p>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <p className="text-sm text-muted">Riwayat presensi semua pegawai</p>
+        <Button size="sm" onClick={() => setKoreksi({ terkunci: false })} disabled={pegawaiList.length === 0}>
+          <Plus className="h-4 w-4" />
+          Tambah / Koreksi Manual
+        </Button>
+      </div>
 
       <div className="mb-4 flex flex-wrap gap-3">
         <Input type="date" label="Dari" value={tanggalMulai} onChange={(e) => setTanggalMulai(e.target.value)} />
@@ -60,12 +80,13 @@ export default function AdminPresensiPage() {
               <th className="px-4 py-3 font-medium">Perangkat</th>
               <th className="px-4 py-3 font-medium">Confidence</th>
               <th className="px-4 py-3 font-medium">Status</th>
+              <th className="px-4 py-3 font-medium"></th>
             </tr>
           </thead>
           <tbody>
             {!loading && daftar.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-muted">
+                <td colSpan={9} className="px-4 py-8 text-center text-muted">
                   Tidak ada data presensi di rentang tanggal ini.
                 </td>
               </tr>
@@ -90,20 +111,62 @@ export default function AdminPresensiPage() {
                 <td className="px-4 py-3 text-muted">{p.confidence_score_masuk ? `${p.confidence_score_masuk}%` : "-"}</td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1.5">
-                    <StatusBadge status={p.status} />
+                    <StatusBadge status={p.status} menit={p.menit_terlambat} />
                     {p.lembur_menit && (
                       <span className="rounded-full bg-espresso-soft px-2.5 py-1 text-xs font-medium text-espresso-dark">
                         Lembur {Math.floor(p.lembur_menit / 60) > 0 ? `${Math.floor(p.lembur_menit / 60)}j ` : ""}
                         {p.lembur_menit % 60}m
                       </span>
                     )}
+                    {p.dikoreksi_at && (
+                      <span
+                        title={p.alasan_koreksi ?? "Dikoreksi admin"}
+                        className="rounded-full bg-paper px-2.5 py-1 text-xs font-medium text-muted ring-1 ring-border"
+                      >
+                        Dikoreksi
+                      </span>
+                    )}
                   </div>
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <button
+                    onClick={() =>
+                      setKoreksi({
+                        terkunci: true,
+                        awal: {
+                          pegawai_profil_id: p.pegawai_profil_id,
+                          tanggal: p.tanggal,
+                          jam_masuk: p.jam_masuk,
+                          jam_pulang: p.jam_pulang,
+                          status: p.status,
+                        },
+                      })
+                    }
+                    className="rounded-lg p-2 text-muted transition-colors hover:bg-paper hover:text-ink"
+                    aria-label="Koreksi presensi"
+                    title="Koreksi"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </Card>
+
+      {koreksi && (
+        <KoreksiModal
+          pegawaiList={pegawaiList}
+          awal={koreksi.awal}
+          terkunci={koreksi.terkunci}
+          onClose={() => setKoreksi(null)}
+          onSaved={() => {
+            setKoreksi(null);
+            setMuat((n) => n + 1);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -83,6 +83,10 @@ export interface AuthUser {
   name: string;
   email: string;
   role: Role;
+  email_verified_at?: string | null;
+  notif_harian?: boolean;
+  no_whatsapp?: string | null;
+  notif_wa?: boolean;
   bisnis?: { id: number; nama_bisnis: string; status: string } | null;
   pegawai_profil?: {
     id: number;
@@ -93,7 +97,7 @@ export interface AuthUser {
 
 // ---------- Langganan ----------
 
-export type FiturKey = "kiosk" | "izin" | "lembur";
+export type FiturKey = "kiosk" | "izin" | "lembur" | "rekap" | "tukar_shift";
 export type StatusLangganan = "trial" | "aktif" | "grace" | "kedaluwarsa" | "nonaktif" | "tanpa_langganan";
 export type Siklus = "bulanan" | "tahunan";
 
@@ -128,6 +132,9 @@ export interface Tagihan {
   jumlah_dasar: number;
   kode_unik: number;
   jumlah_total: number;
+  harga_asli: number | null;
+  diskon: number;
+  kode_kupon: string | null;
   status: "menunggu_pembayaran" | "menunggu_konfirmasi" | "lunas" | "ditolak" | "dibatalkan";
   bukti_url: string | null;
   nama_pengirim: string | null;
@@ -161,4 +168,21 @@ export interface LanggananSaya {
   pembayaran_terbuka: Tagihan | null;
   rekening: Rekening;
   midtrans: { aktif: boolean; client_key: string | null; is_production: boolean };
+}
+
+export interface KuponInfo {
+  kode: string;
+  deskripsi: string | null;
+  tipe: "persen" | "nominal";
+  nilai: number;
+  paket_target: string;
+  berakhir_at: string | null;
+}
+
+/** Potongan harga kupon untuk satu harga (sama dengan hitungan di server, yang tetap memvalidasi ulang). */
+export function hitungDiskonKupon(kupon: KuponInfo | null, kodePaket: string, harga: number): number {
+  if (!kupon || harga <= 0) return 0;
+  if (kupon.paket_target !== "all" && kupon.paket_target !== kodePaket) return 0;
+  const diskon = kupon.tipe === "persen" ? Math.round((harga * kupon.nilai) / 100) : kupon.nilai;
+  return Math.max(0, Math.min(diskon, harga));
 }

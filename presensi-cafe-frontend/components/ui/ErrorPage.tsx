@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { Coffee } from "lucide-react";
+
 import CoffeeBeanPattern from "./CoffeeBeanPattern";
+import { LogoMark } from "@/components/ui/Logo";
 
 /** Halaman error ramah pengguna (403, 404, 419, 500). Tidak pernah menampilkan detail teknis. */
 export default function ErrorPage({
@@ -18,8 +19,8 @@ export default function ErrorPage({
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-paper px-4">
       <CoffeeBeanPattern className="text-espresso" opacity={0.05} />
       <div className="relative w-full max-w-md animate-fade-in-up rounded-card border border-border bg-surface px-8 py-10 text-center shadow-warm-lg">
-        <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-blob bg-bistro-gradient shadow-warm">
-          <Coffee className="h-6 w-6 text-cream" />
+        <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-blob bg-white ring-1 ring-black/5 shadow-warm">
+          <LogoMark className="h-full w-full p-1" />
         </span>
         <p className="bg-espresso-gradient bg-clip-text text-6xl font-extrabold text-transparent">{kode}</p>
         <h1 className="mt-2 text-lg font-semibold text-ink">{judul}</h1>

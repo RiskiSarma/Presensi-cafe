@@ -3,15 +3,18 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Layers, LogOut, Loader2, Building2, Package, CreditCard, UserCog } from "lucide-react";
+import { LogOut, Loader2, Building2, Package, CreditCard, UserCog, LayoutDashboard, Ticket } from "lucide-react";
 import { useRequireRole } from "@/lib/useRequireRole";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
+import { LogoMark } from "@/components/ui/Logo";
 
 const navItems = [
+  { href: "/super-admin/ringkasan", label: "Ringkasan", icon: LayoutDashboard },
   { href: "/super-admin", label: "Bisnis", icon: Building2 },
   { href: "/super-admin/paket", label: "Paket", icon: Package },
   { href: "/super-admin/pembayaran", label: "Pembayaran", icon: CreditCard },
+  { href: "/super-admin/kupon", label: "Kupon", icon: Ticket },
   { href: "/super-admin/profil", label: "Profil", icon: UserCog },
 ];
 
@@ -42,8 +45,8 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
     <div className="flex h-screen overflow-hidden bg-paper">
       <aside className="hidden h-full w-60 shrink-0 flex-col overflow-y-auto border-r border-border/70 bg-surface px-4 py-6 md:flex">
         <div className="mb-8 flex items-center gap-2.5 px-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-espresso-gradient shadow-warm">
-            <Layers className="h-4 w-4 text-cream" />
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white ring-1 ring-black/5 shadow-warm">
+            <LogoMark className="h-full w-full p-1" />
           </span>
           <span className="font-semibold text-ink">Super Admin</span>
         </div>
@@ -90,7 +93,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
       <div className="flex h-full min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-border bg-surface px-4 py-3 md:hidden">
           <div className="flex items-center gap-2">
-            <Layers className="h-5 w-5 text-espresso" />
+            <LogoMark className="h-6 w-6" />
             <span className="font-semibold text-ink">Super Admin</span>
           </div>
           <button onClick={logout} className="text-muted hover:text-danger" aria-label="Keluar">
@@ -108,7 +111,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center gap-0.5 px-2 py-1 text-[10px] ${active ? "text-espresso" : "text-muted"}`}
+                className={`flex flex-1 flex-col items-center gap-0.5 px-1 py-1 text-[10px] ${active ? "text-espresso" : "text-muted"}`}
               >
                 <Icon className="h-5 w-5" />
                 {item.label}

@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Coffee, Sparkles, Leaf, ArrowLeft } from "lucide-react";
+import { Sparkles, Leaf, ArrowLeft } from "lucide-react";
 import CoffeeBeanPattern from "@/components/ui/CoffeeBeanPattern";
 import OrganicBlob from "@/components/ui/OrganicBlob";
+import { LogoMark } from "@/components/ui/Logo";
 
 /** Kerangka halaman autentikasi (daftar, lupa & reset password). Tampilannya disamakan dengan halaman login. */
 export default function AuthShell({
@@ -24,8 +25,8 @@ export default function AuthShell({
         <OrganicBlob className="absolute right-16 top-1/3 h-24 w-24 bg-cream/15" />
 
         <div className="relative z-10 flex max-w-sm flex-col items-start gap-5 px-10 text-cream">
-          <Link href="/" className="flex h-14 w-14 items-center justify-center rounded-blob bg-cream/15 backdrop-blur" aria-label="Ke beranda">
-            <Coffee className="h-7 w-7" />
+          <Link href="/" className="flex h-14 w-14 items-center justify-center rounded-blob bg-white ring-1 ring-black/5 backdrop-blur" aria-label="Ke beranda">
+            <LogoMark className="h-full w-full p-1" />
           </Link>
           <h1 className="text-3xl font-semibold leading-tight">
             Presensi hangat,<br />secepat pesanan.
@@ -56,8 +57,8 @@ export default function AuthShell({
         <div className="relative flex min-h-full items-center justify-center px-4 py-14">
         <div className={`relative w-full ${lebar} animate-fade-in-up`}>
           <Link href="/" className="mb-8 flex flex-col items-center gap-2 text-center lg:hidden">
-            <div className="flex h-12 w-12 items-center justify-center rounded-blob bg-bistro-gradient shadow-warm">
-              <Coffee className="h-6 w-6 text-cream" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-blob bg-white ring-1 ring-black/5 shadow-warm">
+              <LogoMark className="h-full w-full p-1" />
             </div>
             <span className="text-xl font-semibold text-ink">Presensi Cafe</span>
           </Link>

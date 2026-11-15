@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useEffect, useState, FormEvent } from "react";
 import Link from "next/link";
-import { Coffee, ScanFace, Sparkles, Leaf, ArrowLeft } from "lucide-react";
+import { ScanFace, Sparkles, Leaf, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -10,6 +10,7 @@ import PasswordInput from "@/components/ui/PasswordInput";
 import Card from "@/components/ui/Card";
 import CoffeeBeanPattern from "@/components/ui/CoffeeBeanPattern";
 import OrganicBlob from "@/components/ui/OrganicBlob";
+import { LogoMark } from "@/components/ui/Logo";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -17,6 +18,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [infoVerifikasi, setInfoVerifikasi] = useState<"sukses" | "gagal" | null>(null);
+
+  // Hasil klik link verifikasi di email (dibaca dari URL tanpa useSearchParams supaya halaman tetap statis)
+  useEffect(() => {
+    const v = new URLSearchParams(window.location.search).get("verifikasi");
+    if (v === "sukses" || v === "gagal") setInfoVerifikasi(v);
+  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -41,8 +49,8 @@ export default function LoginPage() {
         <OrganicBlob className="absolute right-16 top-1/3 h-24 w-24 bg-cream/15" />
 
         <div className="relative z-10 flex max-w-sm flex-col items-start gap-5 px-10 text-cream">
-          <Link href="/" aria-label="Ke beranda" className="flex h-14 w-14 items-center justify-center rounded-blob bg-cream/15 backdrop-blur transition-transform hover:scale-105">
-            <Coffee className="h-7 w-7" />
+          <Link href="/" aria-label="Ke beranda" className="flex h-14 w-14 items-center justify-center rounded-blob bg-white ring-1 ring-black/5 backdrop-blur transition-transform hover:scale-105">
+            <LogoMark className="h-full w-full p-1" />
           </Link>
           <h1 className="text-3xl font-semibold leading-tight">
             Presensi hangat,<br />secepat pesanan.
@@ -74,8 +82,8 @@ export default function LoginPage() {
 
         <div className="relative w-full max-w-sm animate-fade-in-up">
           <Link href="/" className="mb-8 flex flex-col items-center gap-2 text-center lg:hidden">
-            <div className="flex h-12 w-12 items-center justify-center rounded-blob bg-bistro-gradient shadow-warm">
-              <Coffee className="h-6 w-6 text-cream" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-blob bg-white ring-1 ring-black/5 shadow-warm">
+              <LogoMark className="h-full w-full p-1" />
             </div>
             <h1 className="text-xl font-semibold text-ink">Presensi Cafe</h1>
           </Link>
@@ -85,6 +93,12 @@ export default function LoginPage() {
             <p className="mt-1 text-sm text-muted">Masuk untuk lanjut ke akun kamu</p>
           </div>
 
+          {infoVerifikasi === "sukses" && (
+            <p className="mb-4 rounded-lg bg-success-soft px-3 py-2 text-sm text-success">Email berhasil diverifikasi. Silakan masuk.</p>
+          )}
+          {infoVerifikasi === "gagal" && (
+            <p className="mb-4 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">Link verifikasi tidak valid atau sudah kedaluwarsa. Masuk lalu kirim ulang dari dashboard.</p>
+          )}
           <Card>
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <Input

@@ -8,10 +8,12 @@ import { useRequireRole } from "@/lib/useRequireRole";
 import CameraCapture, { CameraCaptureHandle } from "@/components/CameraCapture";
 import ReceiptCard from "@/components/ui/ReceiptCard";
 import Button from "@/components/ui/Button";
+import { labelStatusPresensi } from "@/lib/status-presensi";
 
 type StatusHariIni = {
   jadwal_hari_ini: { shift: { nama_shift: string; jam_mulai: string; jam_selesai: string } } | null;
   presensi_hari_ini: { jam_masuk: string | null; jam_pulang: string | null; status: string } | null;
+  liveness_aktif?: boolean;
 };
 
 export default function PresensiMobilePage() {
@@ -20,9 +22,10 @@ export default function PresensiMobilePage() {
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [kedip, setKedip] = useState(false);
   const [result, setResult] = useState<"success" | "error" | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successData, setSuccessData] = useState<{ jam: string; status: string } | null>(null);
+  const [successData, setSuccessData] = useState<{ jam: string; status: string; menit: number } | null>(null);
   const cameraRef = useRef<CameraCaptureHandle>(null);
 
   useEffect(() => {
@@ -68,8 +71,21 @@ export default function PresensiMobilePage() {
   async function handleCaptureAndSubmit() {
     setSubmitting(true);
     try {
-      const position = await getLocation();
-      const blob = await cameraRef.current?.capture();
+      const posisiPromise = getLocation();
+      posisiPromise.catch(() => undefined); // GPS dicari paralel supaya foto langsung diambil
+      let blob: Blob | null | undefined;
+      let frames: Blob[] = [];
+
+      if (status?.liveness_aktif) {
+        // Cabang ini mewajibkan kedip mata: rekam rangkaian frame sekitar 2,5 detik
+        setKedip(true);
+        const rekaman = await cameraRef.current?.captureBurst();
+        setKedip(false);
+        blob = rekaman?.foto;
+        frames = rekaman?.frames ?? [];
+      } else {
+        blob = await cameraRef.current?.capture();
+      }
 
       if (!blob) {
         setErrorMsg("Gagal mengambil gambar dari kamera. Coba lagi.");
@@ -79,8 +95,10 @@ export default function PresensiMobilePage() {
         return;
       }
 
+      const position = await posisiPromise;
       const formData = new FormData();
       formData.append("foto", blob, "capture.jpg");
+      frames.forEach((f, i) => formData.append("frames[]", f, `frame${i}.jpg`));
       formData.append("latitude", String(position.coords.latitude));
       formData.append("longitude", String(position.coords.longitude));
 
@@ -94,6 +112,7 @@ export default function PresensiMobilePage() {
       setSuccessData({
         jam: new Date(jamField).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
         status: presensi.status,
+        menit: presensi.menit_terlambat ?? 0,
       });
       setResult("success");
       fetchStatus();
@@ -105,6 +124,7 @@ export default function PresensiMobilePage() {
       }
       setResult("error");
     } finally {
+      setKedip(false);
       setScanning(false);
       setSubmitting(false);
     }
@@ -149,6 +169,11 @@ export default function PresensiMobilePage() {
         {scanning && (
           <div className="flex flex-col items-center gap-4">
             <CameraCapture ref={cameraRef} variant="light" />
+            {status?.liveness_aktif && (
+              <p className={`rounded-lg px-3 py-2 text-center text-sm ${kedip ? "animate-pulse bg-espresso-soft font-semibold text-espresso-dark" : "bg-paper text-muted"}`}>
+                {kedip ? "Kedipkan mata Anda sekarang…" : "Cabang ini memakai verifikasi kedip mata. Saat kamera merekam, kedipkan mata satu kali."}
+              </p>
+            )}
             <p className="flex items-center gap-1.5 text-xs text-muted">
               <MapPin className="h-3.5 w-3.5" />
               Lokasi akan diverifikasi otomatis saat foto diambil
@@ -173,7 +198,7 @@ export default function PresensiMobilePage() {
                 </div>
                 <div className="flex justify-between pt-2">
                   <span className="text-muted">Status</span>
-                  <span className="capitalize">{successData.status.replace("_", " ")}</span>
+                  <span className="capitalize">{labelStatusPresensi(successData.status, successData.menit)}</span>
                 </div>
               </div>
             </ReceiptCard>

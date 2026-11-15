@@ -3,11 +3,13 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Models\Concerns\DicatatAktivitas;
 use Illuminate\Database\Eloquent\Model;
 
 class Cabang extends Model
 {
     use HasFactory;
+    use DicatatAktivitas;
 
     protected $fillable = [
         'bisnis_id',
@@ -16,6 +18,7 @@ class Cabang extends Model
         'latitude',
         'longitude',
         'radius_meter',
+        'liveness_aktif',
         'kiosk_token',
         'is_active',
     ];
@@ -26,6 +29,7 @@ class Cabang extends Model
             'latitude' => 'float',
             'longitude' => 'float',
             'is_active' => 'boolean',
+            'liveness_aktif' => 'boolean',
         ];
     }
 
@@ -60,5 +64,10 @@ class Cabang extends Model
     public function dalamRadius(float $lat, float $long): bool
     {
         return $this->jarakDariCabang($lat, $long) <= $this->radius_meter;
+    }
+
+    public function labelLog(): string
+    {
+        return $this->nama_cabang ?? ('#' . $this->getKey());
     }
 }

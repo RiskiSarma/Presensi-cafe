@@ -19,6 +19,9 @@ class User extends Authenticatable
         'role',
         'bisnis_id',
         'is_active',
+        'notif_harian',
+        'no_whatsapp',
+        'notif_wa',
     ];
 
     protected $hidden = [
@@ -32,6 +35,8 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'notif_harian' => 'boolean',
+            'notif_wa' => 'boolean',
         ];
     }
 

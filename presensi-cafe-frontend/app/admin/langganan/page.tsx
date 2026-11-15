@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Check, X, Loader2, Upload, Copy, CheckCircle2, Clock } from "lucide-react";
-import { api, KatalogFitur, Paket, Siklus, Tagihan } from "@/lib/api";
+import Link from "next/link";
+import { api, hitungDiskonKupon, KatalogFitur, KuponInfo, Paket, Siklus, Tagihan } from "@/lib/api";
 import { useLangganan } from "@/lib/langganan-context";
 import { formatRupiah, formatTanggal, pesanError } from "@/lib/format";
 import { bayarDenganSnap } from "@/lib/midtrans";
@@ -36,6 +37,10 @@ export default function AdminLanggananPage() {
   const [memilihId, setMemilihId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [kodeKupon, setKodeKupon] = useState("");
+  const [kupon, setKupon] = useState<KuponInfo | null>(null);
+  const [kuponError, setKuponError] = useState<string | null>(null);
+  const [cekKupon, setCekKupon] = useState(false);
 
   useEffect(() => {
     api.get("/paket").then(({ data }) => {
@@ -73,17 +78,36 @@ export default function AdminLanggananPage() {
     }
   }
 
+  async function terapkanKupon() {
+    if (!kodeKupon.trim()) return;
+    setCekKupon(true);
+    setKuponError(null);
+    try {
+      const { data } = await api.post("/langganan/kupon/cek", { kode: kodeKupon });
+      setKupon(data);
+    } catch (err) {
+      setKupon(null);
+      setKuponError(pesanError(err, "Kupon tidak valid."));
+    } finally {
+      setCekKupon(false);
+    }
+  }
+
   async function handlePilih(p: Paket, metode: "midtrans" | "transfer") {
     setError(null);
     setInfo(null);
     setMemilihId(p.id);
     try {
-      const { data: res } = await api.post("/langganan/checkout", { paket_id: p.id, siklus, metode });
+      const { data: res } = await api.post("/langganan/checkout", { paket_id: p.id, siklus, metode, kode_kupon: kupon?.kode });
       await refresh();
       fetchRiwayat();
       // Area konten yang ter-scroll adalah <main>, bukan window
       document.querySelector("main")?.scrollTo({ top: 0, behavior: "smooth" });
-      if (metode === "midtrans") bukaSnap(res.tagihan);
+      if (res.tagihan.status === "lunas") {
+        setInfo("Kupon berhasil dipakai. Langganan Anda sudah aktif tanpa biaya.");
+        setKupon(null);
+        setKodeKupon("");
+      } else if (metode === "midtrans") bukaSnap(res.tagihan);
       else setInfo("Tagihan dibuat. Ikuti petunjuk transfer di bawah, lalu unggah bukti transfernya.");
     } catch (err) {
       setError(pesanError(err, "Gagal membuat tagihan."));
@@ -170,6 +194,27 @@ export default function AdminLanggananPage() {
             </div>
           </div>
 
+          <div className="mb-4">
+            <div className="flex max-w-md gap-2">
+              <input
+                value={kodeKupon}
+                onChange={(e) => setKodeKupon(e.target.value.toUpperCase())}
+                placeholder="Punya kode promo?"
+                className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-3.5 py-2.5 text-sm uppercase text-ink placeholder:normal-case placeholder:text-muted/70 focus:border-espresso focus:outline-none focus:ring-2 focus:ring-espresso/20"
+              />
+              <Button variant="secondary" onClick={terapkanKupon} isLoading={cekKupon} disabled={!kodeKupon.trim()}>
+                Terapkan
+              </Button>
+            </div>
+            {kuponError && <p className="mt-1.5 text-xs text-danger">{kuponError}</p>}
+            {kupon && (
+              <p className="mt-1.5 text-xs text-success">
+                Kupon {kupon.kode} terpasang: diskon {kupon.tipe === "persen" ? `${kupon.nilai}%` : formatRupiah(kupon.nilai)}
+                {kupon.paket_target !== "all" && ` (khusus paket ${kupon.paket_target})`}. Dipotong otomatis saat Anda memilih paket.
+              </p>
+            )}
+          </div>
+
           {error && <p className="mb-4 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{error}</p>}
 
           <div className="mb-8 grid gap-4 lg:grid-cols-3">
@@ -186,10 +231,16 @@ export default function AdminLanggananPage() {
                     )}
                   </div>
                   <p className="mb-3 min-h-[2.5rem] text-xs text-muted">{p.deskripsi}</p>
-                  <p className="text-2xl font-semibold text-ink">
-                    {formatRupiah(harga)}
-                    <span className="text-sm font-normal text-muted">/{siklus === "tahunan" ? "tahun" : "bulan"}</span>
-                  </p>
+                  {(() => {
+                    const potongan = hitungDiskonKupon(kupon, p.kode, harga);
+                    return (
+                      <p className="text-2xl font-semibold text-ink">
+                        {potongan > 0 && <span className="mr-2 text-base font-normal text-muted line-through">{formatRupiah(harga)}</span>}
+                        {formatRupiah(harga - potongan)}
+                        <span className="text-sm font-normal text-muted">/{siklus === "tahunan" ? "tahun" : "bulan"}</span>
+                      </p>
+                    );
+                  })()}
                   {siklus === "tahunan" && hematTahunan > 0 && (
                     <p className="text-xs text-success">Hemat {formatRupiah(hematTahunan)} dibanding bulanan</p>
                   )}
@@ -266,9 +317,16 @@ export default function AdminLanggananPage() {
                     {t.status === "ditolak" && t.alasan_tolak && ` · ${t.alasan_tolak}`}
                   </p>
                 </div>
-                <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${labelTagihan[t.status].className}`}>
-                  {labelTagihan[t.status].label}
-                </span>
+                <div className="flex items-center gap-3">
+                  {t.status === "lunas" && (
+                    <Link href={`/admin/langganan/invoice/${t.id}`} className="text-xs font-medium text-espresso-dark underline underline-offset-2">
+                      Invoice
+                    </Link>
+                  )}
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${labelTagihan[t.status].className}`}>
+                    {labelTagihan[t.status].label}
+                  </span>
+                </div>
               </li>
             ))}
           </ul>

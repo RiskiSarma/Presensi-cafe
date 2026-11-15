@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ScanFace, FileText, ChevronRight } from "lucide-react";
+import { ScanFace, FileText, ChevronRight, ArrowLeftRight } from "lucide-react";
 import { api } from "@/lib/api";
 import Card from "@/components/ui/Card";
 import StatusBadge from "@/components/ui/StatusBadge";
@@ -13,6 +13,7 @@ interface Presensi {
   jam_masuk: string | null;
   jam_pulang: string | null;
   status: string;
+  menit_terlambat?: number | null;
   lembur_menit: number | null;
 }
 
@@ -53,6 +54,18 @@ export default function PegawaiDashboardPage() {
         <ChevronRight className="h-5 w-5 text-muted" />
       </Link>
 
+      <Link
+        href="/pegawai/tukar-shift"
+        className="mb-6 flex items-center gap-3 rounded-card border border-border bg-surface px-4 py-4 text-ink transition-colors hover:border-espresso"
+      >
+        <ArrowLeftRight className="h-6 w-6 text-muted" />
+        <div className="flex-1">
+          <p className="font-medium">Tukar Shift</p>
+          <p className="text-xs text-muted">Tukar jadwal dengan rekan</p>
+        </div>
+        <ChevronRight className="h-5 w-5 text-muted" />
+      </Link>
+
       <h2 className="mb-3 text-sm font-semibold text-ink">Riwayat Presensi</h2>
 
       {loading && <p className="text-sm text-muted">Memuat…</p>}
@@ -74,7 +87,7 @@ export default function PegawaiDashboardPage() {
                 {p.jam_pulang ? new Date(p.jam_pulang).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "--:--"}
               </p>
             </div>
-            <StatusBadge status={p.status} />
+            <StatusBadge status={p.status} menit={p.menit_terlambat} />
             {p.lembur_menit && (
               <span className="mt-1 block rounded-full bg-espresso-soft px-2 py-0.5 text-center text-[10px] font-medium text-espresso-dark">
                 Lembur {Math.floor(p.lembur_menit / 60) > 0 ? `${Math.floor(p.lembur_menit / 60)}j ` : ""}

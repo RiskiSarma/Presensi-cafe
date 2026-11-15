@@ -3,11 +3,13 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Models\Concerns\DicatatAktivitas;
 use Illuminate\Database\Eloquent\Model;
 
 class PegawaiProfil extends Model
 {
     use HasFactory;
+    use DicatatAktivitas;
 
     protected $fillable = [
         'user_id',
@@ -62,5 +64,20 @@ class PegawaiProfil extends Model
     public function pengajuanIzins()
     {
         return $this->hasMany(PengajuanIzin::class);
+    }
+
+    public function namaSubjekLog(): string
+    {
+        return 'Pegawai';
+    }
+
+    public function labelLog(): string
+    {
+        return $this->user?->name ?? ('#' . $this->getKey());
+    }
+
+    public function bisnisIdLog(): ?int
+    {
+        return $this->cabang?->bisnis_id;
     }
 }

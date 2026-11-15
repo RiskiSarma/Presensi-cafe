@@ -60,6 +60,12 @@ class RegisterController extends Controller
             return $user;
         });
 
+        try {
+            $user->notify(new \App\Notifications\VerifikasiEmail());
+        } catch (\Throwable $e) {
+            report($e); // gagal kirim email tidak boleh menggagalkan pendaftaran
+        }
+
         return response()->json([
             'user' => $user->load(['pegawaiProfil', 'bisnis']),
             'token' => $user->createToken('auth-token')->plainTextToken,

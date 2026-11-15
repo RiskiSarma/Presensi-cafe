@@ -3,11 +3,13 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Models\Concerns\DicatatAktivitas;
 use Illuminate\Database\Eloquent\Model;
 
 class Shift extends Model
 {
     use HasFactory;
+    use DicatatAktivitas;
 
     protected $fillable = [
         'bisnis_id',
@@ -33,5 +35,10 @@ class Shift extends Model
     public function jadwalShifts()
     {
         return $this->hasMany(JadwalShift::class);
+    }
+
+    public function labelLog(): string
+    {
+        return $this->nama_shift ?? ('#' . $this->getKey());
     }
 }

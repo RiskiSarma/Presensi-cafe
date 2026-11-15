@@ -67,6 +67,11 @@ class AuthController extends Controller
             'email' => 'required|email|unique:users,email,' . $user->id,
             'password' => ['nullable', 'string', 'confirmed', new \App\Rules\PasswordKuat()],
             'current_password' => 'required_with:password|string',
+            'notif_harian' => 'sometimes|boolean',
+            'no_whatsapp' => ['nullable', 'string', 'regex:/^(\+?62|0)8[0-9]{7,12}$/'],
+            'notif_wa' => 'sometimes|boolean',
+        ], [
+            'no_whatsapp.regex' => 'Nomor WhatsApp tidak valid. Harus diawali +62 atau 0, diikuti 8 dan 7-12 digit angka.',
         ]);
 
         if (! empty($validated['password'])) {
@@ -79,12 +84,31 @@ class AuthController extends Controller
         }
 
         $user->name = $validated['name'];
+        if ($user->email !== $validated['email']) {
+            $user->email_verified_at = null; // email baru harus diverifikasi ulang
+        }
         $user->email = $validated['email'];
+        if (array_key_exists('notif_harian', $validated)) {
+            $user->notif_harian = $validated['notif_harian'];
+        }
+        if (array_key_exists('no_whatsapp', $validated)) {
+            $user->no_whatsapp = $validated['no_whatsapp'];
+        }
+        if (array_key_exists('notif_wa', $validated)) {
+            // Whatsapp hanya bisa diaktifkan kalau nomor WA valid dan sudah diisi
+            $user->notif_wa = $validated['notif_wa'];
+        }
         $user->save();
 
         return response()->json([
             'message' => 'Profil berhasil diperbarui.',
             'user' => $user->fresh()->load(['pegawaiProfil', 'bisnis']),
         ]);
+    }
+
+    //* Info fitur tersedia di server untuk halaman profil. */
+    public function opsiProfil(Request $request)
+    {
+        return response()->json(['wa_tersedia' => app(\App\Services\WhatsAppService::class)->aktif()]);
     }
 }

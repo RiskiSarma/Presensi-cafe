@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Coffee, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { LogoMark } from "@/components/ui/Logo";
 
 const tautan = [
   { href: "#fitur", label: "Fitur" },
@@ -35,8 +36,8 @@ export default function Navbar() {
     >
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 md:px-6">
         <Link href="/" className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-blob bg-bistro-gradient shadow-warm">
-            <Coffee className="h-4 w-4 text-cream" />
+          <span className="flex h-9 w-9 items-center justify-center rounded-blob bg-white ring-1 ring-black/5 shadow-warm">
+            <LogoMark className="h-full w-full p-1" />
           </span>
           <span className="font-semibold text-ink">Presensi Cafe</span>
         </Link>

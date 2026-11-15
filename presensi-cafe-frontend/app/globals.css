@@ -122,3 +122,39 @@ h1, h2, h3 {
   opacity: 1;
   transform: none;
 }
+
+/* ==============================
+   Cetak (rekap bulanan -> PDF)
+   ============================== */
+@page {
+  size: A4 portrait;
+  margin: 12mm;
+}
+
+@page landscape {
+  size: A4 landscape;
+  margin: 10mm;
+}
+
+@media print {
+  .print-landscape {
+    page: landscape;
+  }
+}
+
+@media print {
+  aside,
+  header,
+  nav.fixed {
+    display: none !important;
+  }
+  div.h-screen,
+  div.h-full,
+  main {
+    height: auto !important;
+    overflow: visible !important;
+  }
+  body {
+    background: #fff !important;
+  }
+}

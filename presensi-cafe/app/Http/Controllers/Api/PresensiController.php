@@ -14,12 +14,14 @@ use Illuminate\Support\Carbon;
 
 class PresensiController extends Controller
 {
-    protected float $ambangBatasConfidence = 70.0;
+    protected float $ambangBatasConfidence = 55.0;
 
     public function checkInMobile(Request $request, FaceRecognitionService $faceService)
     {
         $request->validate([
             'foto' => 'required|image|max:5120',
+            'frames' => 'nullable|array|max:30',
+            'frames.*' => 'image|max:2048',
             'latitude' => 'required|numeric',
             'longitude' => 'required|numeric',
         ]);
@@ -32,6 +34,10 @@ class PresensiController extends Controller
         $cekGps = $this->validasiGps($pegawai, $request->latitude, $request->longitude);
         if (! $cekGps['valid']) {
             return response()->json(['message' => $cekGps['message']], 422);
+        }
+
+        if ($tolak = $this->tolakJikaTidakHidup($request, $pegawai->cabang, $faceService)) {
+            return $tolak;
         }
 
         $embeddingAktif = $pegawai->faceEmbeddingAktif()->latest()->first();
@@ -57,6 +63,8 @@ class PresensiController extends Controller
     {
         $request->validate([
             'foto' => 'required|image|max:5120',
+            'frames' => 'nullable|array|max:30',
+            'frames.*' => 'image|max:2048',
             'latitude' => 'required|numeric',
             'longitude' => 'required|numeric',
         ]);
@@ -69,6 +77,10 @@ class PresensiController extends Controller
         $cekGps = $this->validasiGps($pegawai, $request->latitude, $request->longitude);
         if (! $cekGps['valid']) {
             return response()->json(['message' => $cekGps['message']], 422);
+        }
+
+        if ($tolak = $this->tolakJikaTidakHidup($request, $pegawai->cabang, $faceService)) {
+            return $tolak;
         }
 
         $embeddingAktif = $pegawai->faceEmbeddingAktif()->latest()->first();
@@ -94,6 +106,8 @@ class PresensiController extends Controller
     {
         $request->validate([
             'foto' => 'required|image|max:5120',
+            'frames' => 'nullable|array|max:30',
+            'frames.*' => 'image|max:2048',
             'latitude' => 'required|numeric',
             'longitude' => 'required|numeric',
         ]);
@@ -111,6 +125,10 @@ class PresensiController extends Controller
             ], 422);
         }
 
+        if ($tolak = $this->tolakJikaTidakHidup($request, $cabang, $faceService)) {
+            return $tolak;
+        }
+
         $identifikasi = $this->identifikasiWajah($request->file('foto'), $faceService, $cabang);
         if (! $identifikasi['success']) {
             return response()->json(['message' => $identifikasi['message']], 422);
@@ -126,6 +144,8 @@ class PresensiController extends Controller
     {
         $request->validate([
             'foto' => 'required|image|max:5120',
+            'frames' => 'nullable|array|max:30',
+            'frames.*' => 'image|max:2048',
             'latitude' => 'required|numeric',
             'longitude' => 'required|numeric',
         ]);
@@ -141,6 +161,10 @@ class PresensiController extends Controller
             ], 422);
         }
 
+        if ($tolak = $this->tolakJikaTidakHidup($request, $cabang, $faceService)) {
+            return $tolak;
+        }
+
         $identifikasi = $this->identifikasiWajah($request->file('foto'), $faceService, $cabang);
         if (! $identifikasi['success']) {
             return response()->json(['message' => $identifikasi['message']], 422);
@@ -152,6 +176,17 @@ class PresensiController extends Controller
         return $this->prosesCheckOut($pegawai, $request->file('foto'), 'kiosk', $jenisPerangkat, $identifikasi['confidence'], $request->latitude, $request->longitude);
     }
 
+    /** Info cabang untuk tablet kiosk (apakah wajib kedip mata). */
+    public function infoKiosk(Request $request)
+    {
+        $cabang = $request->attributes->get('cabang');
+
+        return response()->json([
+            'nama_cabang' => $cabang?->nama_cabang,
+            'liveness_aktif' => (bool) $cabang?->liveness_aktif,
+        ]);
+    }
+
     public function riwayatSaya(Request $request)
     {
         $pegawai = $request->user()->pegawaiProfil;
@@ -161,7 +196,7 @@ class PresensiController extends Controller
             ->when($request->bulan, fn ($q) => $q->whereMonth('tanggal', $request->bulan))
             ->when($request->tahun, fn ($q) => $q->whereYear('tanggal', $request->tahun))
             ->orderByDesc('tanggal')
-            ->paginate(31);
+            ->paginate(min(max((int) $request->input('per_page', 31), 1), 500));
 
         return response()->json($riwayat);
     }
@@ -171,11 +206,23 @@ class PresensiController extends Controller
         $pegawai = $request->user()->pegawaiProfil;
 
         $presensi = $pegawai->presensis()->whereDate('tanggal', today())->first();
-        $jadwal = $pegawai->jadwalShifts()->with('shift')->whereDate('tanggal', today())->first();
+
+        // Shift yang lewat tengah malam (mis. 16:00-00:00): setelah lewat jam 00:00 presensi kemarin
+        // yang belum absen pulang masih terbuka, supaya tombol "Absen Pulang" tetap muncul.
+        if (! $presensi) {
+            $presensi = $pegawai->presensis()
+                ->whereDate('tanggal', today()->subDay())
+                ->whereNotNull('jam_masuk')
+                ->whereNull('jam_pulang')
+                ->first();
+        }
+
+        $jadwal = $pegawai->jadwalShifts()->with('shift')->whereDate('tanggal', $presensi?->tanggal ?? today())->first();
 
         return response()->json([
             'jadwal_hari_ini' => $jadwal,
             'presensi_hari_ini' => $presensi,
+            'liveness_aktif' => (bool) $pegawai->cabang?->liveness_aktif,
         ]);
     }
 
@@ -201,6 +248,42 @@ class PresensiController extends Controller
         }
 
         return response()->json($query->orderByDesc('tanggal')->paginate(31));
+    }
+
+    /**
+     * Kalau cabang mewajibkan verifikasi kedip mata, tolak presensi tanpa rangkaian frame yang berkedip.
+     * Return null kalau lolos / tidak diwajibkan.
+     */
+    protected function tolakJikaTidakHidup(Request $request, ?Cabang $cabang, FaceRecognitionService $faceService)
+    {
+        if (! $cabang?->liveness_aktif) {
+            return null;
+        }
+
+        $frames = $request->file('frames');
+        if (! is_array($frames) || count($frames) < 8) {
+            return response()->json([
+                'message' => 'Verifikasi kedipan diperlukan. Kedipkan mata satu kali saat kamera merekam.',
+                'kode' => 'LIVENESS_DIBUTUHKAN',
+            ], 422);
+        }
+
+        $hasil = $faceService->cekLiveness($frames);
+
+        if (! $hasil['success']) {
+            return response()->json(['message' => $hasil['message'] ?? 'Verifikasi kedipan gagal. Coba lagi.'], 422);
+        }
+        if (! $hasil['konsisten']) {
+            return response()->json(['message' => 'Wajah berubah selama perekaman. Pastikan hanya satu orang di depan kamera.', 'kode' => 'LIVENESS_GAGAL'], 422);
+        }
+        if (! $hasil['live']) {
+            return response()->json([
+                'message' => $hasil['message'] ?? 'Kedipan mata tidak terdeteksi. Hadap kamera dengan cahaya cukup, kedipkan mata satu kali dengan jelas, lalu coba lagi.',
+                'kode' => 'LIVENESS_GAGAL',
+            ], 422);
+        }
+
+        return null;
     }
 
     protected function identifikasiWajah($foto, FaceRecognitionService $faceService, ?Cabang $cabang): array
@@ -266,11 +349,33 @@ class PresensiController extends Controller
         }
 
         $jadwal = JadwalShift::where('pegawai_profil_id', $pegawai->id)->whereDate('tanggal', today())->with('shift')->first();
+        $sekarang = now();
 
         $status = 'tepat_waktu';
+        $menitTerlambat = null; // null = tidak ada jadwal, 0 = datang sebelum/tepat jam mulai
+
         if ($jadwal) {
-            $batasToleransi = Carbon::parse($jadwal->shift->jam_mulai)->addMinutes($jadwal->shift->toleransi_telat_menit);
-            if (now()->format('H:i:s') > $batasToleransi->format('H:i:s')) {
+            $shift = $jadwal->shift;
+            $mulai = today()->setTimeFromTimeString($shift->jam_mulai);
+            $selesai = today()->setTimeFromTimeString($shift->jam_selesai);
+            if ($selesai->lte($mulai)) {
+                $selesai->addDay(); // shift lewat tengah malam, mis. 16:00-00:00
+            }
+
+            // Shift sudah berakhir: tidak bisa check-in lagi (admin mengoreksi lewat Laporan Presensi)
+            if ($sekarang->gte($selesai)) {
+                return response()->json([
+                    'message' => "Shift {$shift->nama_shift} sudah berakhir pukul {$selesai->format('H:i')}. Hubungi admin untuk koreksi presensi.",
+                ], 422);
+            }
+
+            // Telat dihitung dari JAM MULAI shift. Lewat batas toleransi = "terlambat",
+            // masih dalam toleransi = tetap "tepat_waktu" tapi menit telatnya tercatat dan ditampilkan.
+            $menitTerlambat = $sekarang->gt($mulai)
+                ? (int) floor(($sekarang->getTimestamp() - $mulai->getTimestamp()) / 60)
+                : 0;
+
+            if ($menitTerlambat > (int) $shift->toleransi_telat_menit) {
                 $status = 'terlambat';
             }
         }
@@ -281,7 +386,7 @@ class PresensiController extends Controller
             ['pegawai_profil_id' => $pegawai->id, 'tanggal' => today()],
             [
                 'jadwal_shift_id' => $jadwal?->id,
-                'jam_masuk' => now(),
+                'jam_masuk' => $sekarang,
                 'device_type_masuk' => $deviceType,
                 'jenis_perangkat_masuk' => $jenisPerangkat,
                 'latitude_masuk' => $lat,
@@ -289,11 +394,19 @@ class PresensiController extends Controller
                 'foto_bukti_masuk' => $path,
                 'confidence_score_masuk' => $confidence,
                 'status' => $status,
+                'menit_terlambat' => $menitTerlambat,
             ]
         );
 
+        $pesan = 'Check-in berhasil.';
+        if ($menitTerlambat) {
+            $pesan .= $status === 'terlambat'
+                ? " Anda terlambat {$menitTerlambat} menit."
+                : " Anda datang {$menitTerlambat} menit setelah jam mulai (masih dalam toleransi).";
+        }
+
         return response()->json([
-            'message' => 'Check-in berhasil.',
+            'message' => $pesan,
             'data' => $presensi->load(['pegawaiProfil.user', 'jadwalShift.shift']),
         ], 201);
     }
@@ -304,14 +417,21 @@ class PresensiController extends Controller
             return response()->json(['message' => 'Data pegawai tidak ditemukan.'], 404);
         }
 
-        $presensi = Presensi::where('pegawai_profil_id', $pegawai->id)->whereDate('tanggal', today())->first();
+        // Cari presensi yang masih terbuka (sudah masuk, belum pulang). Kemarin ikut dicari
+        // supaya shift yang lewat tengah malam tetap bisa absen pulang setelah jam 00:00.
+        $presensi = Presensi::where('pegawai_profil_id', $pegawai->id)
+            ->whereNotNull('jam_masuk')
+            ->whereNull('jam_pulang')
+            ->whereDate('tanggal', '>=', today()->subDay())
+            ->orderByDesc('tanggal')
+            ->first();
 
-        if (! $presensi || ! $presensi->jam_masuk) {
-            return response()->json(['message' => 'Anda belum check-in hari ini.'], 422);
-        }
+        if (! $presensi) {
+            $hariIni = Presensi::where('pegawai_profil_id', $pegawai->id)->whereDate('tanggal', today())->first();
 
-        if ($presensi->jam_pulang) {
-            return response()->json(['message' => 'Anda sudah check-out hari ini.'], 422);
+            return response()->json([
+                'message' => ($hariIni && $hariIni->jam_pulang) ? 'Anda sudah check-out hari ini.' : 'Anda belum check-in hari ini.',
+            ], 422);
         }
 
         $status = $presensi->status;
@@ -322,13 +442,19 @@ class PresensiController extends Controller
         $lemburAktif = $bisnis && app(\App\Services\LanggananService::class)->punyaFitur($bisnis, 'lembur');
 
         if ($presensi->jadwalShift) {
-            $jamSelesaiShift = today()->setTimeFromTimeString($presensi->jadwalShift->shift->jam_selesai);
+            $shift = $presensi->jadwalShift->shift;
+            $tanggalJadwal = $presensi->tanggal->copy()->startOfDay();
+            $mulai = $tanggalJadwal->copy()->setTimeFromTimeString($shift->jam_mulai);
+            $jamSelesaiShift = $tanggalJadwal->copy()->setTimeFromTimeString($shift->jam_selesai);
+            if ($jamSelesaiShift->lte($mulai)) {
+                $jamSelesaiShift->addDay(); // shift lewat tengah malam
+            }
             $sekarang = now();
 
             if ($sekarang->lt($jamSelesaiShift)) {
                 $status = 'pulang_cepat';
             } else {
-                $menitLewat = $jamSelesaiShift->diffInMinutes($sekarang);
+                $menitLewat = (int) round(($sekarang->getTimestamp() - $jamSelesaiShift->getTimestamp()) / 60);
                 $ambangLembur = config('presensi.ambang_lembur_menit', 30);
 
                 if ($lemburAktif && $menitLewat > $ambangLembur) {
