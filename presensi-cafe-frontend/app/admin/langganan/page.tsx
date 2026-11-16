@@ -10,6 +10,7 @@ import { bayarDenganSnap } from "@/lib/midtrans";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import BatalkanTagihan from "@/components/admin/BatalkanTagihan";
 
 const labelStatus: Record<string, { label: string; className: string }> = {
   trial: { label: "Masa Percobaan", className: "bg-espresso-soft text-espresso-dark" },
@@ -392,9 +393,7 @@ function TagihanTerbuka({
           <Button onClick={onBayarOnline} className="flex-1">
             Lanjut bayar
           </Button>
-          <Button variant="ghost" onClick={handleBatal}>
-            Batalkan
-          </Button>
+          <BatalkanTagihan tagihanId={tagihan.id} onDone={onChanged} onError={setError} />
         </div>
       </Card>
     );
@@ -427,15 +426,15 @@ function TagihanTerbuka({
     }
   }
 
-  async function handleBatal() {
-    if (!confirm("Batalkan tagihan ini?")) return;
-    try {
-      await api.delete(`/langganan/pembayaran/${tagihan.id}`);
-      onChanged();
-    } catch (err) {
-      setError(pesanError(err, "Gagal membatalkan tagihan."));
-    }
-  }
+  // async function handleBatal() {
+  //   if (!confirm("Batalkan tagihan ini?")) return;
+  //   try {
+  //     await api.delete(`/langganan/pembayaran/${tagihan.id}`);
+  //     onChanged();
+  //   } catch (err) {
+  //     setError(pesanError(err, "Gagal membatalkan tagihan."));
+  //   }
+  // }
 
   return (
     <Card className="mb-6 border-espresso/40 bg-cream">
@@ -501,9 +500,7 @@ function TagihanTerbuka({
               {menungguKonfirmasi ? "Kirim ulang bukti" : "Kirim bukti transfer"}
             </Button>
             {!menungguKonfirmasi && (
-              <Button variant="ghost" onClick={handleBatal}>
-                Batalkan
-              </Button>
+              <BatalkanTagihan tagihanId={tagihan.id} onDone={onChanged} onError={setError} />
             )}
           </div>
         </div>
